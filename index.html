@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Villa Olimpia - Gestionale</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+
+  <!-- ========================================== -->
+  <!-- 1. SEZIONE LOGIN -->
+  <!-- ========================================== -->
+  <div id="sezioneLogin" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 p-4">
+    <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md border border-blue-100 space-y-6">
+      <div class="text-center space-y-2">
+        <div class="text-4xl">🏨</div>
+        <h1 class="text-2xl font-extrabold text-blue-950">Villa Olimpia</h1>
+        <p class="text-xs text-gray-500 uppercase tracking-widest font-bold">Portale Gestionale Integrato</p>
+      </div>
+
+      <form id="formLogin" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Email Aziendale / Personale</label>
+          <input type="email" id="loginEmail" required class="w-full px-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-blue-600 outline-none text-sm" placeholder="es. m.rossi@villaolimpia.it">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">PIN d'Accesso (4 cifre)</label>
+          <input type="password" id="loginPin" maxlength="4" required class="w-full px-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-blue-600 outline-none text-center font-mono tracking-widest text-lg" placeholder="••••">
+        </div>
+        <button type="submit" class="w-full py-3 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-bold text-sm shadow-lg transition">Accedi al Gestionale</button>
+      </form>
+
+      <div id="erroreLogin" class="hidden p-3 bg-red-50 border border-red-200 text-red-700 text-xs text-center rounded-xl font-bold"></div>
+    </div>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- 2. CONTENITORE PRINCIPALE (DASHBOARD) -->
+  <!-- ========================================== -->
+  <div id="appContenitore" class="hidden min-h-screen flex flex-col md:flex-row">
+    
+    <!-- Sidebar di Navigazione -->
+    <aside class="w-full md:w-64 bg-blue-950 text-white flex flex-col justify-between p-4 shadow-xl">
+      <div class="space-y-6">
+        <div class="flex items-center space-x-3 px-2 py-3 border-b border-blue-900">
+          <span class="text-2xl">🏨</span>
+          <div>
+            <h2 class="text-base font-extrabold tracking-wide">Villa Olimpia</h2>
+            <span id="badgeRuolo" class="px-2 py-0.5 bg-blue-800 text-blue-200 text-[10px] font-bold rounded uppercase">Ruolo</span>
+          </div>
+        </div>
+
+        <!-- Voci di Menu -->
+        <nav class="space-y-1.5">
+          <button onclick="selezionaSezione('comunicazioni')" id="btn-comunicazioni" class="btn-sidebar w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition bg-blue-600 text-white shadow-md">
+            <span class="flex items-center gap-2">📢 Comunicazioni & Mansioni</span>
+            <span id="badgeContatoreRossoSidebar" class="hidden px-1.5 py-0.5 bg-red-600 text-white text-[10px] rounded-full font-bold">0</span>
+          </button>
+
+          <!-- Voci Anagrafica (Visibili a Master o autorizzati) -->
+          <button onclick="selezionaSezione('oss')" id="btn-oss" class="btn-sidebar hidden w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-gray-200 hover:bg-blue-900/60 transition">👥 Anagrafica OSS</button>
+          <button onclick="selezionaSezione('infermieri')" id="btn-infermieri" class="btn-sidebar hidden w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-gray-200 hover:bg-blue-900/60 transition">👥 Anagrafica Infermieri</button>
+          <button onclick="selezionaSezione('altri')" id="btn-altri" class="btn-sidebar hidden w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-gray-200 hover:bg-blue-900/60 transition">👥 Altri Lavoratori</button>
+
+          <!-- Voci Turnazioni -->
+          <button onclick="selezionaSezione('turni-oss')" id="btn-turni-oss" class="btn-sidebar hidden w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-gray-200 hover:bg-blue-900/60 transition">📅 Turnazione OSS</button>
+          <button onclick="selezionaSezione('turni-infermieri')" id="btn-turni-infermieri" class="btn-sidebar hidden w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-gray-200 hover:bg-blue-900/60 transition">📅 Turnazione Infermieri</button>
+        </nav>
+      </div>
+
+      <!-- Info Utente Loggato & Logout -->
+      <div class="pt-4 border-t border-blue-900 space-y-3">
+        <div class="text-xs px-2">
+          <div class="text-gray-400">Utente connesso:</div>
+          <div id="labelNomeUtente" class="font-bold text-white truncate">Nome Utente</div>
+        </div>
+        <button onclick="logout()" class="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition shadow">🚪 Esci / Logout</button>
+      </div>
+    </aside>
+
+    <!-- Contenuto Dinamico Principale -->
+    <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+      
+      <!-- ================= VISTA COMUNICAZIONI ================= -->
+      <div id="vista-comunicazioni" class="vista-contenuto space-y-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-md border">
+          <div>
+            <h2 class="text-xl font-extrabold text-blue-950">Bacheca Comunicazioni & Mansioni</h2>
+            <p class="text-xs text-gray-500">Aggiornamenti, circolari e compiti operativi assegnati.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="filtraComunicazioni('tutte')" id="filtroCom-tutte" class="px-3 py-1.5 bg-blue-900 text-white rounded-lg text-xs font-bold transition">Tutte</button>
+            <button onclick="filtraComunicazioni('non_lette')" id="filtroCom-non_lette" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold transition">Non Lette</button>
+            <button onclick="filtraComunicazioni('mansioni')" id="filtroCom-mansioni" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold transition">Mansioni</button>
+            <button onclick="apriModalNuovaComunicazione()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow transition">➕ Nuova Comunicazione / Mansione</button>
+          </div>
+        </div>
+
+        <div id="grigliaComunicazioni" class="grid grid-cols-1 gap-4">
+          <!-- Popolato dinamicamente da app.js -->
+        </div>
+
+        <!-- DIARIO GIORNALIERO DEL MASTER (Visibile solo al Master) -->
+        <div id="boxDiarioMasterContainer" class="bg-white p-6 rounded-2xl shadow-md border mt-8">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-base font-extrabold text-blue-950">📖 Diario Giornaliero Attività & Permessi</h3>
+            <span class="text-[10px] bg-blue-50 text-blue-800 px-2.5 py-1 rounded-md font-bold uppercase">Monitoraggio Master</span>
+          </div>
+          <div id="contenutoDiarioMaster" class="space-y-2 max-h-96 overflow-y-auto">
+            <!-- Voci del diario popolate dinamicamente -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= VISTA ANAGRAFICA OSS ================= -->
+      <div id="vista-oss" class="vista-contenuto hidden space-y-6">
+        <div class="flex justify-between items-center bg-white p-6 rounded-2xl shadow-md border">
+          <div>
+            <h2 class="text-xl font-extrabold text-blue-950">Anagrafica Personale OSS</h2>
+            <p class="text-xs text-gray-500">Gestione operatori sociosanitari, PIN, contatti e permessi.</p>
+          </div>
+          <button onclick="apriModalNuovoUtente()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow transition">➕ Nuovo Utente</button>
+        </div>
+        <div class="bg-white rounded-2xl shadow-md border overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-blue-950 text-white">
+              <tr>
+                <th class="p-3">Operatore</th>
+                <th class="p-3">Stato</th>
+                <th class="p-3">Contatti & Anagrafica</th>
+                <th class="p-3 text-center">PIN</th>
+                <th class="p-3 text-center">Azioni</th>
+              </tr>
+            </thead>
+            <tbody id="tabellaOSS" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================= VISTA ANAGRAFICA INFERMIERI ================= -->
+      <div id="vista-infermieri" class="vista-contenuto hidden space-y-6">
+        <div class="flex justify-between items-center bg-white p-6 rounded-2xl shadow-md border">
+          <div>
+            <h2 class="text-xl font-extrabold text-blue-950">Anagrafica Personale Infermieristico</h2>
+            <p class="text-xs text-gray-500">Gestione infermieri, PIN, contatti e permessi.</p>
+          </div>
+          <button onclick="apriModalNuovoUtente()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow transition">➕ Nuovo Utente</button>
+        </div>
+        <div class="bg-white rounded-2xl shadow-md border overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-blue-950 text-white">
+              <tr>
+                <th class="p-3">Operatore</th>
+                <th class="p-3">Stato</th>
+                <th class="p-3">Contatti & Anagrafica</th>
+                <th class="p-3 text-center">PIN</th>
+                <th class="p-3 text-center">Azioni</th>
+              </tr>
+            </thead>
+            <tbody id="tabellaInfermieri" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================= VISTA ALTRI LAVORATORI ================= -->
+      <div id="vista-altri" class="vista-contenuto hidden space-y-6">
+        <div class="flex justify-between items-center bg-white p-6 rounded-2xl shadow-md border">
+          <div>
+            <h2 class="text-xl font-extrabold text-blue-950">Anagrafica Altri Lavoratori</h2>
+            <p class="text-xs text-gray-500">Personale amministrativo, educativo, tecnico e ausiliario.</p>
+          </div>
+          <button onclick="apriModalNuovoUtente()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow transition">➕ Nuovo Utente</button>
+        </div>
+        <div class="bg-white rounded-2xl shadow-md border overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-blue-950 text-white">
+              <tr>
+                <th class="p-3">Operatore</th>
+                <th class="p-3">Stato</th>
+                <th class="p-3">Contatti & Anagrafica</th>
+                <th class="p-3 text-center">PIN</th>
+                <th class="p-3 text-center">Azioni</th>
+              </tr>
+            </thead>
+            <tbody id="tabellaAltri" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================= VISTA TURNAZIONE OSS ================= -->
+      <div id="vista-turni-oss" class="vista-contenuto hidden space-y-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-md border">
+          <div>
+            <h2 class="text-xl font-extrabold text-blue-950">Turnazione Mensile - OSS</h2>
+            <p class="text-xs text-gray-500">Pianificazione turni, gestione ferie/malattie e copertura antincendio 🔥.</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <input type="month" id="turniMeseAnno-OSS" onchange="caricaTabellaTurniSpecifica('OSS')" class="px-3 py-2 border rounded-xl text-xs font-bold">
+            <button onclick="apriModalGestioneSigle()" class="px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-xl text-xs font-bold">⚙️ Configura Sigle</button>
+            <button onclick="apriModalEccezioniIA('OSS')" id="btnSalvaIA-OSS" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold">🤖 Genera con IA</button>
+            <button onclick="salvaTurniSpecifica('OSS')" id="btnSalvaTurni-OSS" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">💾 Salva Turni</button>
+            <button onclick="pubblicaEInviaTurni('OSS')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow">📢 Pubblica e Invia</button>
+            <button onclick="stampaTurniA3('OSS')" class="px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-xl text-xs font-bold">🖨️ Stampa A3</button>
+          </div>
+        </div>
+
+        <!-- Form Inserimento Assenza OSS -->
+        <div class="bg-white p-5 rounded-2xl shadow-md border">
+          <h3 class="text-xs font-extrabold uppercase text-blue-950 mb-3">Inserisci Assenza / Ferie / Malattia (OSS)</h3>
+          <form id="formAssenza-OSS" onsubmit="registraAssenzaSpecifica(event, 'OSS')" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Operatore</label>
+              <select id="assenzaUtente-OSS" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold"></select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Tipo Assenza</label>
+              <select id="assenzaTipo-OSS" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+                <option value="F">Ferie (F)</option>
+                <option value="MAL">Malattia (MAL)</option>
+                <option value="X">Assenza Giustificata (X)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Dal Giorno</label>
+              <input type="date" id="assenzaDal-OSS" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Al Giorno</label>
+              <input type="date" id="assenzaAl-OSS" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+            </div>
+            <div class="flex items-end">
+              <button type="submit" class="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow">Registra Assenza</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Tabella Tabellone Turni OSS -->
+        <div class="bg-white rounded-2xl shadow-md border overflow-x-auto">
+          <table class="w-full border-collapse text-center text-xs">
+            <thead id="headTabellaTurni-OSS" class="bg-blue-950 text-white"></thead>
+            <tbody id="bodyTabellaTurni-OSS" class="divide-y"></tbody>
+            <tfoot id="footTabellaTurni-OSS" class="bg-blue-950 text-white font-bold"></tfoot>
+          </table>
+        </div>
+
+        <!-- Registro Assenze OSS -->
+        <div class="bg-white p-5 rounded-2xl shadow-md border">
+          <h3 class="text-xs font-extrabold uppercase text-blue-950 mb-3">Registro Assenze Registrate (OSS)</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                  <th class="p-2">Operatore</th>
+                  <th class="p-2">Tipo</th>
+                  <th class="p-2">Periodo</th>
+                  <th class="p-2 text-center">Azione</th>
+                </tr>
+              </thead>
+              <tbody id="listaAssenze-OSS" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= VISTA TURNAZIONE INFERMIERI ================= -->
+      <div id="vista-turni-infermieri" class="vista-contenuto hidden space-y-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-md border">
+          <div>
+            <h2 class="text-xl font-extrabold text-blue-950">Turnazione Mensile - Infermieri</h2>
+            <p class="text-xs text-gray-500">Pianificazione turni, gestione ferie/malattie e copertura antincendio 🔥.</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <input type="month" id="turniMeseAnno-Infermiere" onchange="caricaTabellaTurniSpecifica('Infermiere')" class="px-3 py-2 border rounded-xl text-xs font-bold">
+            <button onclick="apriModalGestioneSigle()" class="px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-xl text-xs font-bold">⚙️ Configura Sigle</button>
+            <button onclick="apriModalEccezioniIA('Infermiere')" id="btnSalvaIA-Infermiere" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold">🤖 Genera con IA</button>
+            <button onclick="salvaTurniSpecifica('Infermiere')" id="btnSalvaTurni-Infermiere" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">💾 Salva Turni</button>
+            <button onclick="pubblicaEInviaTurni('Infermiere')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow">📢 Pubblica e Invia</button>
+            <button onclick="stampaTurniA3('Infermiere')" class="px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-xl text-xs font-bold">🖨️ Stampa A3</button>
+          </div>
+        </div>
+
+        <!-- Form Inserimento Assenza Infermieri -->
+        <div class="bg-white p-5 rounded-2xl shadow-md border">
+          <h3 class="text-xs font-extrabold uppercase text-blue-950 mb-3">Inserisci Assenza / Ferie / Malattia (Infermiere)</h3>
+          <form id="formAssenza-Infermiere" onsubmit="registraAssenzaSpecifica(event, 'Infermiere')" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Operatore</label>
+              <select id="assenzaUtente-Infermiere" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold"></select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Tipo Assenza</label>
+              <select id="assenzaTipo-Infermiere" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+                <option value="F">Ferie (F)</option>
+                <option value="MAL">Malattia (MAL)</option>
+                <option value="X">Assenza Giustificata (X)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Dal Giorno</label>
+              <input type="date" id="assenzaDal-Infermiere" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Al Giorno</label>
+              <input type="date" id="assenzaAl-Infermiere" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+            </div>
+            <div class="flex items-end">
+              <button type="submit" class="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow">Registra Assenza</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Tabella Tabellone Turni Infermieri -->
+        <div class="bg-white rounded-2xl shadow-md border overflow-x-auto">
+          <table class="w-full border-collapse text-center text-xs">
+            <thead id="headTabellaTurni-Infermiere" class="bg-blue-950 text-white"></thead>
+            <tbody id="bodyTabellaTurni-Infermiere" class="divide-y"></tbody>
+            <tfoot id="footTabellaTurni-Infermiere" class="bg-blue-950 text-white font-bold"></tfoot>
+          </table>
+        </div>
+
+        <!-- Registro Assenze Infermieri -->
+        <div class="bg-white p-5 rounded-2xl shadow-md border">
+          <h3 class="text-xs font-extrabold uppercase text-blue-950 mb-3">Registro Assenze Registrate (Infermiere)</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                  <th class="p-2">Operatore</th>
+                  <th class="p-2">Tipo</th>
+                  <th class="p-2">Periodo</th>
+                  <th class="p-2 text-center">Azione</th>
+                </tr>
+              </thead>
+              <tbody id="listaAssenze-Infermiere" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- MODALI DI SISTEMA -->
+  <!-- ========================================== -->
+
+  <!-- Modal Anagrafica Utente & Permessi -->
+  <div id="modalNuovoUtente" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="bg-blue-950 text-white px-6 py-4 flex justify-between items-center">
+        <h3 id="titoloModalUtente" class="text-base font-extrabold">📝 Anagrafica e Permessi Utente</h3>
+        <button onclick="chiudiModalNuovoUtente()" class="text-white font-bold text-lg">✕</button>
+      </div>
+
+      <form id="formNuovoUtente" class="p-6 space-y-4 overflow-y-auto flex-1">
+        <input type="hidden" id="editUtenteId">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nome</label>
+            <input type="text" id="nuovoNome" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Cognome</label>
+            <input type="text" id="nuovoCognome" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Data di Nascita</label>
+            <input type="date" id="nuovoDataNascita" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Luogo di Nascita</label>
+            <input type="text" id="nuovoLuogoNascita" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Provincia di Nascita</label>
+            <select id="nuovoProvinciaNascita" class="w-full px-3 py-2 border rounded-xl text-xs font-bold"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Codice Fiscale</label>
+            <input type="text" id="nuovoCF" class="w-full px-3 py-2 border rounded-xl text-xs font-bold uppercase">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Telefono</label>
+            <input type="text" id="nuovoTelefono" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Email (Login)</label>
+            <input type="email" id="nuovoEmail" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Residenza</label>
+            <input type="text" id="nuovoResidenza" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Categoria</label>
+            <select id="nuovoCategoria" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+              <option value="OSS">OSS</option>
+              <option value="Infermiere">Infermiere</option>
+              <option value="Altro">Altro Lavoratore</option>
+            </select>
+          </div>
+          <div class="flex items-center space-x-2 pt-6">
+            <input type="checkbox" id="nuovoAntincendio" class="w-4 h-4 text-blue-600 rounded">
+            <label for="nuovoAntincendio" class="text-xs font-bold text-gray-700">Abilitato Antincendio 🔥</label>
+          </div>
+        </div>
+
+        <!-- Sezione Gestione Permessi -->
+        <div class="bg-gray-50 p-4 rounded-2xl border space-y-3 mt-4">
+          <h4 class="text-xs font-extrabold text-blue-950 uppercase">Configurazione Ruolo e Permessi</h4>
+          <div class="flex items-center space-x-2 pb-2 border-b">
+            <input type="checkbox" id="perm_is_master" onchange="toggleMasterMode(this)" class="w-4 h-4 text-red-600 rounded">
+            <label for="perm_is_master" class="text-xs font-bold text-red-700">👑 Master (Accesso Totale e Direzione)</label>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 pt-1 text-xs">
+            <label class="flex items-center space-x-2"><input type="checkbox" id="perm_turni_oss" class="perm-check w-4 h-4 text-blue-600 rounded"><span>Turni OSS</span></label>
+            <label class="flex items-center space-x-2"><input type="checkbox" id="perm_turni_infermieri" class="perm-check w-4 h-4 text-blue-600 rounded"><span>Turni Infermieri</span></label>
+            <label class="flex items-center space-x-2"><input type="checkbox" id="perm_assenze" class="perm-check w-4 h-4 text-blue-600 rounded"><span>Assenze</span></label>
+            <label class="flex items-center space-x-2"><input type="checkbox" id="perm_cambi" class="perm-check w-4 h-4 text-blue-600 rounded"><span>Cambi Turno</span></label>
+            <label class="flex items-center space-x-2"><input type="checkbox" id="perm_mansioni" class="perm-check w-4 h-4 text-blue-600 rounded"><span>Mansioni</span></label>
+            <label class="flex items-center space-x-2"><input type="checkbox" id="perm_anagrafica" class="perm-check w-4 h-4 text-blue-600 rounded"><span>Anagrafica</span></label>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-4 border-t">
+          <button type="button" onclick="chiudiModalNuovoUtente()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Annulla</button>
+          <button type="submit" id="btnSalvaUtente" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow">Salva e Genera PIN</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Nuova Comunicazione / Mansione -->
+  <div id="modalNuovaComunicazione" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="bg-blue-950 text-white px-6 py-4 flex justify-between items-center">
+        <h3 class="text-base font-extrabold">📢 Nuova Comunicazione / Mansione</h3>
+        <button onclick="chiudiModalNuovaComunicazione()" class="text-white font-bold text-lg">✕</button>
+      </div>
+      <form id="formNuovaComunicazione" onsubmit="inviaComunicazione(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Titolo</label>
+          <input type="text" id="comTitolo" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold" placeholder="Titolo dell'avviso...">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Tipo</label>
+            <select id="comTipo" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+              <option value="comunicazione">Comunicazione</option>
+              <option value="mansione">Mansione Operativa</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Destinatari</label>
+            <select id="comDestinatari" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+              <option value="tutti">Tutti</option>
+              <option value="OSS">OSS</option>
+              <option value="Infermiere">Infermieri</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Riferimento Ospite (Opzionale)</label>
+          <select id="comOspiteId" class="w-full px-3 py-2 border rounded-xl text-xs font-bold"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Testo / Dettagli</label>
+          <textarea id="comTesto" rows="4" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold" placeholder="Scrivi il messaggio o la mansione dettagliata..."></textarea>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2 border-t">
+          <button type="button" onclick="chiudiModalNuovaComunicazione()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Annulla</button>
+          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow">Pubblica in Bacheca</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Gestione Sigle Turni -->
+  <div id="modalSigleTurni" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="bg-blue-950 text-white px-6 py-4 flex justify-between items-center">
+        <h3 class="text-base font-extrabold">⚙️ Configurazione Sigle Turno</h3>
+        <button onclick="chiudiModalGestioneSigle()" class="text-white font-bold text-lg">✕</button>
+      </div>
+      <div class="p-6 space-y-6 overflow-y-auto flex-1">
+        <form id="formNuovaSigla" onsubmit="salvaNuovaSigla(event)" class="bg-gray-50 p-4 rounded-2xl border space-y-3">
+          <input type="hidden" id="editSiglaId">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Sigla</label>
+              <input type="text" id="siglaCodice" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold uppercase" placeholder="es. M">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Inizio</label>
+              <input type="time" id="siglaInizio" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Fine</label>
+              <input type="time" id="siglaFine" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Descrizione</label>
+              <input type="text" id="siglaDesc" class="w-full px-3 py-2 border rounded-xl text-xs font-bold" placeholder="es. Mattina">
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" id="btnSalvaSigla" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow">+ Aggiungi</button>
+          </div>
+        </form>
+
+        <div class="overflow-hidden border rounded-2xl">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-blue-950 text-white">
+              <tr>
+                <th class="p-2.5">Sigla</th>
+                <th class="p-2.5">Orario</th>
+                <th class="p-2.5">Ore</th>
+                <th class="p-2.5 text-center">Azioni</th>
+              </tr>
+            </thead>
+            <tbody id="listaSigleEsistenti" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Eccezioni & IA -->
+  <div id="modalEccezioniIA" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="bg-purple-950 text-white px-6 py-4 flex justify-between items-center">
+        <h3 class="text-base font-extrabold">🤖 Generazione Turni con Intelligenza Artificiale</h3>
+        <button onclick="chiudiModalEccezioniIA()" class="text-white font-bold text-lg">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">OSS Mattina</label>
+            <input type="number" id="iaNumMattina" value="2" class="w-full px-3 py-2 border rounded-xl text-xs font-bold text-center">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">OSS Pomeriggio</label>
+            <input type="number" id="iaNumPomeriggio" value="2" class="w-full px-3 py-2 border rounded-xl text-xs font-bold text-center">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">OSS Notte</label>
+            <input type="number" id="iaNumNotte" value="1" class="w-full px-3 py-2 border rounded-xl text-xs font-bold text-center">
+          </div>
+        </div>
+
+        <div class="bg-gray-50 p-4 rounded-2xl border space-y-3">
+          <h4 class="text-xs font-extrabold uppercase text-purple-900">Aggiungi Vincolo / Eccezione Operatore</h4>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Operatore</label>
+              <select id="iaEccezioneUtente" class="w-full px-3 py-2 border rounded-xl text-xs font-bold"></select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Regola</label>
+              <select id="iaTipoVincolo" onchange="cambiaTipoVincoloIA(this.value)" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+                <option value="puntuale">Turno in giorno specifico</option>
+                <option value="solo_turno">Sempre questo turno</option>
+                <option value="no_turno">Escludi questo turno</option>
+                <option value="solo_weekend">Lavora solo weekend</option>
+                <option value="no_weekend">Escluso dai weekend</option>
+              </select>
+            </div>
+          </div>
+          <div id="boxGiornoVincolo" class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Giorno del Mese</label>
+              <input type="number" id="iaEccezioneGiorno" min="1" max="31" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Sigla Turno</label>
+              <select id="iaEccezioneSigla" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+                <option value="M">M (Mattina)</option>
+                <option value="P">P (Pomeriggio)</option>
+                <option value="N">N (Notte)</option>
+                <option value="RIP">Riposo</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <button type="button" onclick="vincolaListaIA()" class="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold">+ Aggiungi Regola</button>
+          </div>
+        </div>
+
+        <div id="listaEccezioniContainer" class="space-y-1 max-h-32 overflow-y-auto"></div>
+
+        <div class="flex justify-end space-x-2 pt-3 border-t">
+          <button type="button" onclick="chiudiModalEccezioniIA()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Annulla</button>
+          <button type="button" onclick="avviaGenerazioneIAEsecuzione()" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow">🤖 Avvia Generazione IA</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Riepilogo Ore Mensili Individuale -->
+  <div id="modalRiepilogoOre" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="bg-blue-950 text-white px-6 py-4 flex justify-between items-center">
+        <h3 class="text-base font-extrabold">⏱️ Riepilogo Ore Mensili Dipendente</h3>
+        <button onclick="chiudiModalRiepilogoOre()" class="text-white font-bold text-lg">✕</button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1" id="areaStampaResocontoOre">
+        <div class="flex justify-between items-center no-print">
+          <div>
+            <h4 id="titoloPeriodoResoconto" class="text-sm font-bold text-blue-950">Periodo: --</h4>
+            <div id="infoAnagraficaResoconto" class="text-xs text-gray-600 mt-1"></div>
+          </div>
+          <div>
+            <input type="month" id="inputMeseResocontoOre" onchange="generaResocontoOreIndividuo()" class="px-3 py-2 border rounded-xl text-xs font-bold">
+          </div>
+        </div>
+
+        <div class="border rounded-2xl overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-blue-900 text-white">
+              <tr>
+                <th class="p-2.5">Giorno</th>
+                <th class="p-2.5">Data</th>
+                <th class="p-2.5">Turno</th>
+                <th class="p-2.5 text-right">Ore</th>
+              </tr>
+            </thead>
+            <tbody id="tabellaDettaglioOreIndividuo" class="divide-y"></tbody>
+            <tfoot class="bg-blue-950 text-white font-bold">
+              <tr>
+                <td colspan="3" class="p-3 text-right uppercase">Totale Ore Mese:</td>
+                <td id="totaleOreResocontoIndividuo" class="p-3 text-right text-sm">0.0h</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="p-4 bg-gray-50 border-t flex justify-end space-x-2">
+        <button onclick="chiudiModalRiepilogoOre()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Chiudi</button>
+        <button onclick="stampaResocontoOreA4()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow">🖨️ Stampa A4</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Allegati Corsi & Attestati -->
+  <div id="modalCorsi" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="bg-teal-900 text-white px-6 py-4 flex justify-between items-center">
+        <h3 class="text-base font-extrabold">📎 Carica Attestato o Corso</h3>
+        <button onclick="chiudiModalCorsi()" class="text-white font-bold text-lg">✕</button>
+      </div>
+      <form id="formCorso" class="p-6 space-y-4">
+        <input type="hidden" id="corsoUtenteId">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Titolo del Corso / Attestato</label>
+          <input type="text" id="corsoTitolo" required class="w-full px-3 py-2 border rounded-xl text-xs font-bold" placeholder="es. Attestato Antincendio IV Edizione">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Seleziona File (PDF / Immagine)</label>
+          <input type="file" id="corsoFile" required accept=".pdf,image/*" class="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+        </div>
+        <div class="flex justify-end space-x-2 pt-2 border-t">
+          <button type="button" onclick="chiudiModalCorsi()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Annulla</button>
+          <button type="submit" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow">Carica Allegato</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Scheda Anagrafica Completa (Stampa) -->
+  <div id="modalAnagraficaCompleta" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="bg-gray-900 text-white px-6 py-4 flex justify-between items-center no-print">
+        <h3 class="text-base font-extrabold">📇 Scheda Personale Dipendente</h3>
+        <button onclick="chiudiModalAnagraficaCompleta()" class="text-white font-bold text-lg">✕</button>
+      </div>
+      <div class="p-8 space-y-6 overflow-y-auto flex-1 bg-white" id="contenutoSchedaAnagrafica">
+        <!-- Contenuto dinamico della scheda -->
+      </div>
+      <div class="p-4 bg-gray-50 border-t flex justify-end space-x-2 no-print">
+        <button onclick="chiudiModalAnagraficaCompleta()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold">Chiudi</button>
+        <button onclick="window.print()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow">🖨️ Stampa Scheda</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collegamento allo script principale -->
+  <script src="app.js"></script>
+</body>
+</html>
